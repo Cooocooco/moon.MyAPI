@@ -4,6 +4,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -11,32 +13,32 @@ using System.Web.Http;
 
 namespace moon.MyAPI.Controllers
 {
-    public class ModbusTCPController : ApiController
+    public class AuboController : ApiController
     {
-        private readonly List<string>  List;
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, List<ushort>>>  AddressDict;
-        private readonly ConcurrentDictionary<string, DataModel>  DataDict;
+        private readonly List<string> List;
+        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, List<ushort>>> AddressDict;
+        private readonly ConcurrentDictionary<string, DataModel> DataDict;
 
 
         /// <summary>
         /// 构造函数，初始化控制器
         /// </summary>
-        public ModbusTCPController()
+        public AuboController()
         {
             // 从配置文件读取设备IP地址和访问地址信息
             var data = Tools.ReadIni();
-             List = new List<string>();
-             List = data["ModbusTCP"]["IP"].Split(',', (char)StringSplitOptions.RemoveEmptyEntries).Distinct().ToList();
-             AddressDict = new ConcurrentDictionary<string, ConcurrentDictionary<string, List<ushort>>>();
+            List = new List<string>();
+            List = data["Aubo"]["IP"].Split(',', (char)StringSplitOptions.RemoveEmptyEntries).Distinct().ToList();
+            AddressDict = new ConcurrentDictionary<string, ConcurrentDictionary<string, List<ushort>>>();
 
             // 使用并行处理每个设备的访问地址
-            Parallel.ForEach( List, ip =>
+            Parallel.ForEach(List, ip =>
             {
                 var subDict = new ConcurrentDictionary<string, List<ushort>>(data[ip].Select(key => new KeyValuePair<string, List<ushort>>(key.KeyName, key.Value.Split(',').Select(ushort.Parse).ToList())));
-                 AddressDict.TryAdd(ip, subDict);
+                AddressDict.TryAdd(ip, subDict);
             });
 
-             DataDict = new ConcurrentDictionary<string, DataModel>();
+            DataDict = new ConcurrentDictionary<string, DataModel>();
         }
 
 
@@ -45,42 +47,38 @@ namespace moon.MyAPI.Controllers
         /// </summary>
         private async Task<Dictionary<string, object>> ReadDataAsync(string ip, ModbusIpMaster adapter)
         {
-            var address =  AddressDict[ip];
+            var address = AddressDict[ip];
             var result = new Dictionary<string, object>();
             foreach (var kvp in address)
             {
                 switch (kvp.Key)
                 {
-                    case "ReadCoils":
-                        var value = kvp.Value;
-                        Console.WriteLine($"{value[0]}, {value[1]}");
-                        var msg = await adapter.ReadCoilsAsync(0x01, value[0], value[1]).ConfigureAwait(false); // 读取ReadCoils数据
-                        result.Add(kvp.Key, msg);
+                    case "Joint":
+                        var Jointvalue = kvp.Value;
+                        var msg = await adapter.ReadInputRegistersAsync(0x01, Jointvalue[0], Jointvalue[1]).ConfigureAwait(false);
+                        var ushorts = msg.Select(x => (short)x);
+                        result.Add(kvp.Key, ushorts);
                         break;
-                    case "ReadInputs":
-                        var value1 = kvp.Value;
-                        Console.WriteLine($"{value1[0]}, {value1[1]}");
-                        var msg1 = await adapter.ReadInputsAsync(0x01, value1[0], value1[1]).ConfigureAwait(false); // 读取ReadInputs数据
+                    case "DI":
+                        var DIvalue = kvp.Value;
+                        var msg1 = await adapter.ReadInputsAsync(DIvalue[0], DIvalue[1]).ConfigureAwait(false);
                         result.Add(kvp.Key, msg1);
                         break;
-                    case "ReadHoldingRegisters":
-                        var value2 = kvp.Value;
-                        Console.WriteLine($"{value2[0]}, {value2[1]}");
-                        var msg2 = await adapter.ReadHoldingRegistersAsync(0x01, value2[0], value2[1]).ConfigureAwait(false); // 读取ReadHoldingRegisters数据
-                        var data2 = msg2.Select(x => (short)x);
-                        result.Add(kvp.Key, data2);
+                    case "DO":
+                        var DOvalue = kvp.Value;
+                        var msg2 = await adapter.ReadInputsAsync(DOvalue[0], DOvalue[1]).ConfigureAwait(false);
+                        result.Add(kvp.Key, msg2);
                         break;
-                    case "ReadInputRegisters":
-                        var value3 = kvp.Value;
-                        Console.WriteLine($"{value3[0]}, {value3[1]}");
-                        var msg3 = await adapter.ReadInputRegistersAsync(0x01, value3[0], value3[1]).ConfigureAwait(false); // 读取ReadInputRegisters数据
-                        var data3 = msg3.Select(x => (short)x);
-                        result.Add(kvp.Key, data3);
+                    case "AO":
+                        var ModbusAO = kvp.Value;
+                        var msg3 = await adapter.ReadHoldingRegistersAsync(0x01, ModbusAO[0], ModbusAO[1]).ConfigureAwait(false);
+                        result.Add(kvp.Key, msg3);
                         break;
                     default:
                         break;
                 }
             }
+
             return result;
         }
 
@@ -89,7 +87,7 @@ namespace moon.MyAPI.Controllers
         /// </summary>
         private async Task<DataModel> GetDataAsync(string ip)
         {
-            if ( DataDict.TryGetValue(ip, out var cachedResult))
+            if (DataDict.TryGetValue(ip, out var cachedResult))
             {
                 return cachedResult;
             }
@@ -104,7 +102,7 @@ namespace moon.MyAPI.Controllers
                     Data = null,
                     Date = DateTime.Now.ToString("G")
                 };
-                 DataDict.TryAdd(ip, cachedResult);
+                DataDict.TryAdd(ip, cachedResult);
 
                 return cachedResult;
             }
@@ -123,7 +121,7 @@ namespace moon.MyAPI.Controllers
                         Data = axisData,
                         Date = DateTime.Now.ToString("G")
                     };
-                     DataDict.TryAdd(ip, cachedResult);
+                    DataDict.TryAdd(ip, cachedResult);
                 }
                 catch (Exception)
                 {
@@ -134,7 +132,7 @@ namespace moon.MyAPI.Controllers
                         Data = null,
                         Date = DateTime.Now.ToString("G")
                     };
-                     DataDict.TryAdd(ip, cachedResult);
+                    DataDict.TryAdd(ip, cachedResult);
                 }
             }
             return cachedResult;
@@ -173,14 +171,14 @@ namespace moon.MyAPI.Controllers
         {
             try
             {
-                var tasks =  List.AsParallel().Select(ip => GetDataAsync(ip));
+                var tasks = List.AsParallel().Select(ip => GetDataAsync(ip));
                 var results = await Task.WhenAll(tasks);
 
                 return results;
             }
             catch (Exception)
             {
-                var errorModels =  List.AsParallel().Select(ip => new DataModel
+                var errorModels = List.AsParallel().Select(ip => new DataModel
                 {
                     Ip = ip,
                     Data = null,
