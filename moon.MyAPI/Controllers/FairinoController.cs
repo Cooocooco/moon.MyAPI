@@ -135,7 +135,6 @@ namespace moon.MyAPI.Controllers
         /// </summary>
         /// <param name="ip">设备IP地址</param>
         /// <returns>单个设备的数据</returns>
-        [HttpGet]
         public async Task<DataModel> Get(string ip)
         {
             try
@@ -158,7 +157,6 @@ namespace moon.MyAPI.Controllers
         /// 获取全部设备数据
         /// </summary>
         /// <returns></returns>
-        [HttpGet]
         public async Task<IEnumerable<DataModel>> GetAll()
         {
             try

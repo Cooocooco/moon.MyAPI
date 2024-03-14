@@ -13,9 +13,9 @@ namespace moon.MyAPI.Controllers
 {
     public class ModbusTCPController : ApiController
     {
-        private readonly List<string>  List;
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, List<ushort>>>  AddressDict;
-        private readonly ConcurrentDictionary<string, DataModel>  DataDict;
+        private readonly List<string> List;
+        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, List<ushort>>> AddressDict;
+        private readonly ConcurrentDictionary<string, DataModel> DataDict;
 
 
         /// <summary>
@@ -25,18 +25,18 @@ namespace moon.MyAPI.Controllers
         {
             // 从配置文件读取设备IP地址和访问地址信息
             var data = Tools.ReadIni();
-             List = new List<string>();
-             List = data["ModbusTCP"]["IP"].Split(',', (char)StringSplitOptions.RemoveEmptyEntries).Distinct().ToList();
-             AddressDict = new ConcurrentDictionary<string, ConcurrentDictionary<string, List<ushort>>>();
+            List = new List<string>();
+            List = data["ModbusTCP"]["IP"].Split(',', (char)StringSplitOptions.RemoveEmptyEntries).Distinct().ToList();
+            AddressDict = new ConcurrentDictionary<string, ConcurrentDictionary<string, List<ushort>>>();
 
             // 使用并行处理每个设备的访问地址
-            Parallel.ForEach( List, ip =>
+            Parallel.ForEach(List, ip =>
             {
                 var subDict = new ConcurrentDictionary<string, List<ushort>>(data[ip].Select(key => new KeyValuePair<string, List<ushort>>(key.KeyName, key.Value.Split(',').Select(ushort.Parse).ToList())));
-                 AddressDict.TryAdd(ip, subDict);
+                AddressDict.TryAdd(ip, subDict);
             });
 
-             DataDict = new ConcurrentDictionary<string, DataModel>();
+            DataDict = new ConcurrentDictionary<string, DataModel>();
         }
 
 
@@ -45,7 +45,7 @@ namespace moon.MyAPI.Controllers
         /// </summary>
         private async Task<Dictionary<string, object>> ReadDataAsync(string ip, ModbusIpMaster adapter)
         {
-            var address =  AddressDict[ip];
+            var address = AddressDict[ip];
             var result = new Dictionary<string, object>();
             foreach (var kvp in address)
             {
@@ -89,7 +89,7 @@ namespace moon.MyAPI.Controllers
         /// </summary>
         private async Task<DataModel> GetDataAsync(string ip)
         {
-            if ( DataDict.TryGetValue(ip, out var cachedResult))
+            if (DataDict.TryGetValue(ip, out var cachedResult))
             {
                 return cachedResult;
             }
@@ -104,7 +104,7 @@ namespace moon.MyAPI.Controllers
                     Data = null,
                     Date = DateTime.Now.ToString("G")
                 };
-                 DataDict.TryAdd(ip, cachedResult);
+                DataDict.TryAdd(ip, cachedResult);
 
                 return cachedResult;
             }
@@ -123,7 +123,7 @@ namespace moon.MyAPI.Controllers
                         Data = axisData,
                         Date = DateTime.Now.ToString("G")
                     };
-                     DataDict.TryAdd(ip, cachedResult);
+                    DataDict.TryAdd(ip, cachedResult);
                 }
                 catch (Exception)
                 {
@@ -134,7 +134,7 @@ namespace moon.MyAPI.Controllers
                         Data = null,
                         Date = DateTime.Now.ToString("G")
                     };
-                     DataDict.TryAdd(ip, cachedResult);
+                    DataDict.TryAdd(ip, cachedResult);
                 }
             }
             return cachedResult;
@@ -145,7 +145,6 @@ namespace moon.MyAPI.Controllers
         /// </summary>
         /// <param name="ip">设备IP地址</param>
         /// <returns>单个设备的数据</returns>
-        [HttpGet]
         public async Task<DataModel> Get(string ip)
         {
             try
@@ -168,19 +167,18 @@ namespace moon.MyAPI.Controllers
         /// 获取全部设备数据
         /// </summary>
         /// <returns></returns>
-        [HttpGet]
         public async Task<IEnumerable<DataModel>> GetAll()
         {
             try
             {
-                var tasks =  List.AsParallel().Select(ip => GetDataAsync(ip));
+                var tasks = List.AsParallel().Select(ip => GetDataAsync(ip));
                 var results = await Task.WhenAll(tasks);
 
                 return results;
             }
             catch (Exception)
             {
-                var errorModels =  List.AsParallel().Select(ip => new DataModel
+                var errorModels = List.AsParallel().Select(ip => new DataModel
                 {
                     Ip = ip,
                     Data = null,
