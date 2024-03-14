@@ -26,7 +26,7 @@ namespace moon.MyAPI.Controllers
             // 从配置文件读取设备IP地址和访问地址信息
             var data = Tools.ReadIni();
             List = new List<string>();
-            List = data["XinJie"]["IP"].Split(',', (char)StringSplitOptions.RemoveEmptyEntries).Distinct().ToList();
+            List = data["Xinjie"]["IP"].Split(',', (char)StringSplitOptions.RemoveEmptyEntries).Distinct().ToList();
             AddressDict = new ConcurrentDictionary<string, ConcurrentDictionary<string, List<ushort>>>();
 
             // 使用并行处理每个设备的访问地址
