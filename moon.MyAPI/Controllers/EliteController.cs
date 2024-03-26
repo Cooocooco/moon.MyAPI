@@ -109,6 +109,11 @@ namespace moon.MyAPI.Controllers
                         var DO_concatenatedBinaryValue = string.Join("", DO_BinaryValues16);   //将数组中的每个值连接在一起，形成一个新的字符串
                         result.Add(kvp.Key, DO_concatenatedBinaryValue);
                         break;
+                    case "AO":
+                        var AO_value = kvp.Value;
+                        var AO_msg = await adapter.ReadInputsAsync(0x01, AO_value[0], AO_value[1]).ConfigureAwait(false);
+                        result.Add(kvp.Key, AO_msg);
+                        break;
                     default:
                         break;
                 }
